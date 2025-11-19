@@ -17,7 +17,11 @@ class Config:
     DATA_DIR = os.path.join(BASE_DIR, 'data')
     
     # SQLAlchemy Database Configuration
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or f'sqlite:///{os.path.join(DATA_DIR, "database.db")}'
+    # Railway PostgreSQL URL starts with postgres:// but SQLAlchemy needs postgresql://
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url and database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    SQLALCHEMY_DATABASE_URI = database_url or f'sqlite:///{os.path.join(DATA_DIR, "database.db")}'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ECHO = False  # Set True để debug SQL queries
     
@@ -31,13 +35,17 @@ class Config:
     SESSION_REFRESH_EACH_REQUEST = True  # Refresh session timeout mỗi request
     
     # File upload configuration
-    MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB max file size
+    MAX_CONTENT_LENGTH = 500 * 1024 * 1024  # 500MB max file size per upload (tạm thời cho import)
+    MAX_STORAGE_SIZE = 2 * 1024 * 1024 * 1024  # 2GB total storage limit
     ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'doc', 'docx', 'xls', 'xlsx', 'zip'}
     
     # Application settings
     DOMAIN_NAME = os.environ.get('DOMAIN_NAME', None)
     HOST = os.environ.get('HOST', '0.0.0.0')
     PORT = int(os.environ.get('PORT', 5001))
+    
+    # Railway specific
+    RAILWAY_ENVIRONMENT = os.environ.get('RAILWAY_ENVIRONMENT', None)
     
     # Logging
     LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
