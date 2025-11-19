@@ -161,7 +161,7 @@ def forbidden_error(error):
 @app.errorhandler(413)
 def request_entity_too_large(error):
     """Xử lý lỗi 413 - File quá lớn"""
-    flash('File tải lên quá lớn! Kích thước tối đa là 50MB.', 'danger')
+    flash('File tải lên quá lớn! Kích thước tối đa mỗi file là 250MB.', 'danger')
     return redirect(request.referrer or url_for('dashboard'))
 
 @login_manager.user_loader
@@ -608,11 +608,19 @@ def dashboard():
     # Sắp xếp theo số lượng giảm dần
     categories_with_stats.sort(key=lambda x: x['count'], reverse=True)
     
+    # Tính dung lượng storage
+    storage_used = file_storage.get_total_storage_size()
+    storage_max = app.config.get('MAX_STORAGE_SIZE', 2 * 1024 * 1024 * 1024)  # 2GB
+    storage_percent = (storage_used / storage_max * 100) if storage_max > 0 else 0
+    
     return render_template('dashboard.html', 
                          notes_count=notes_count,
                          docs_count=docs_count,
                          categories_with_stats=categories_with_stats,
-                         categories_dict=categories_dict)
+                         categories_dict=categories_dict,
+                         storage_used=storage_used,
+                         storage_max=storage_max,
+                         storage_percent=storage_percent)
 
 @app.route('/notes/<int:id>/view')
 @login_required
@@ -637,14 +645,24 @@ def add_attachment_to_note(id):
     if 'attachments' in request.files:
         files = request.files.getlist('attachments')
         uploaded_count = 0
+        error_messages = []
+        
         for file in files:
             if file and file.filename:
-                if file_storage.add_note_attachment(id, file):
+                success, message = file_storage.add_note_attachment(id, file)
+                if success:
                     uploaded_count += 1
+                else:
+                    error_messages.append(f"{file.filename}: {message}")
         
         if uploaded_count > 0:
             flash(f'Đã thêm {uploaded_count} file đính kèm!', 'success')
-        else:
+        
+        if error_messages:
+            for error_msg in error_messages:
+                flash(error_msg, 'danger')
+        
+        if uploaded_count == 0 and not error_messages:
             flash('Không có file nào được tải lên!', 'warning')
     
     return redirect(url_for('view_note', id=id))
@@ -761,10 +779,16 @@ def new_note():
             # Xử lý file đính kèm
             if 'attachments' in request.files:
                 files = request.files.getlist('attachments')
+                upload_errors = []
                 for file in files:
                     if file and file.filename:
-                        if file_storage.add_note_attachment(note.id, file):
-                            pass  # File đã được lưu
+                        success, message = file_storage.add_note_attachment(note.id, file)
+                        if not success:
+                            upload_errors.append(f"{file.filename}: {message}")
+                
+                if upload_errors:
+                    for error in upload_errors:
+                        flash(error, 'warning')
             
             # Không cần xử lý pasted images nữa vì chúng đã được thêm vào attachments
             
@@ -840,10 +864,16 @@ def edit_note(id):
             # Xử lý file đính kèm mới
             if 'attachments' in request.files:
                 files = request.files.getlist('attachments')
+                upload_errors = []
                 for file in files:
                     if file and file.filename:
-                        if file_storage.add_note_attachment(id, file):
-                            pass  # File đã được lưu
+                        success_upload, message = file_storage.add_note_attachment(id, file)
+                        if not success_upload:
+                            upload_errors.append(f"{file.filename}: {message}")
+                
+                if upload_errors:
+                    for error in upload_errors:
+                        flash(error, 'warning')
             
             # Không cần xử lý pasted images nữa vì chúng đã được thêm vào attachments
             
