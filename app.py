@@ -1938,9 +1938,38 @@ def import_data():
             else:
                 # Merge categories
                 current_categories = load_categories()
-                for cat in imported_categories:
-                    if cat not in current_categories:
-                        current_categories.append(cat)
+                
+                # Check if categories is dict or list
+                if isinstance(imported_categories, dict):
+                    # New format: dict
+                    if isinstance(current_categories, dict):
+                        # Merge dict into dict
+                        for cat_key, cat_data in imported_categories.items():
+                            if cat_key not in current_categories:
+                                current_categories[cat_key] = cat_data
+                    else:
+                        # Current is list (old format), convert to dict
+                        new_categories = {}
+                        for cat in current_categories:
+                            new_categories[cat] = {'name': cat, 'parent': None, 'children': []}
+                        # Add imported categories
+                        for cat_key, cat_data in imported_categories.items():
+                            if cat_key not in new_categories:
+                                new_categories[cat_key] = cat_data
+                        current_categories = new_categories
+                else:
+                    # Old format: list
+                    if isinstance(current_categories, list):
+                        # Merge list into list
+                        for cat in imported_categories:
+                            if cat not in current_categories:
+                                current_categories.append(cat)
+                    else:
+                        # Current is dict, imported is list
+                        for cat in imported_categories:
+                            if cat not in current_categories:
+                                current_categories[cat] = {'name': cat, 'parent': None, 'children': []}
+                
                 save_categories(current_categories)
         
         # 4. Import edit_logs.json
