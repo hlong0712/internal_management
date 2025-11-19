@@ -161,7 +161,7 @@ def forbidden_error(error):
 @app.errorhandler(413)
 def request_entity_too_large(error):
     """Xử lý lỗi 413 - File quá lớn"""
-    flash('File tải lên quá lớn! Kích thước tối đa mỗi file là 250MB.', 'danger')
+    flash('File tải lên quá lớn! Kích thước tối đa mỗi file là 500MB.', 'danger')
     return redirect(request.referrer or url_for('dashboard'))
 
 @login_manager.user_loader
