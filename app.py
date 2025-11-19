@@ -1902,19 +1902,29 @@ def import_data():
                     imported_metadata = json.load(f)
                 current_metadata = file_storage._load_metadata()
                 
+                # Đảm bảo current_metadata có cấu trúc đúng
+                if 'notes' not in current_metadata or not isinstance(current_metadata['notes'], list):
+                    current_metadata['notes'] = []
+                if 'docs' not in current_metadata or not isinstance(current_metadata['docs'], list):
+                    current_metadata['docs'] = []
+                
                 # Merge notes
-                imported_note_ids = {n['id'] for n in imported_metadata.get('notes', [])}
-                current_metadata['notes'] = [n for n in current_metadata.get('notes', []) 
-                                           if n['id'] not in imported_note_ids]
-                current_metadata['notes'].extend(imported_metadata.get('notes', []))
-                import_count['notes'] = len(imported_metadata.get('notes', []))
+                imported_notes = imported_metadata.get('notes', [])
+                if isinstance(imported_notes, list):
+                    imported_note_ids = {n['id'] for n in imported_notes if isinstance(n, dict) and 'id' in n}
+                    current_metadata['notes'] = [n for n in current_metadata['notes'] 
+                                               if n.get('id') not in imported_note_ids]
+                    current_metadata['notes'].extend(imported_notes)
+                    import_count['notes'] = len(imported_notes)
                 
                 # Merge docs
-                imported_doc_ids = {d['id'] for d in imported_metadata.get('docs', [])}
-                current_metadata['docs'] = [d for d in current_metadata.get('docs', []) 
-                                          if d['id'] not in imported_doc_ids]
-                current_metadata['docs'].extend(imported_metadata.get('docs', []))
-                import_count['docs'] = len(imported_metadata.get('docs', []))
+                imported_docs = imported_metadata.get('docs', [])
+                if isinstance(imported_docs, list):
+                    imported_doc_ids = {d['id'] for d in imported_docs if isinstance(d, dict) and 'id' in d}
+                    current_metadata['docs'] = [d for d in current_metadata['docs'] 
+                                              if d.get('id') not in imported_doc_ids]
+                    current_metadata['docs'].extend(imported_docs)
+                    import_count['docs'] = len(imported_docs)
                 
                 file_storage._save_metadata(current_metadata)
         
