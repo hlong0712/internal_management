@@ -239,10 +239,66 @@ class FileStorage:
                 return True
         return False
     
+    def get_total_storage_size(self):
+        """Tính tổng dung lượng đã sử dụng (bytes)"""
+        total_size = 0
+        
+        # Tính dung lượng uploads
+        for root, dirs, files in os.walk(self.uploads_dir):
+            for file in files:
+                filepath = os.path.join(root, file)
+                if os.path.exists(filepath):
+                    total_size += os.path.getsize(filepath)
+        
+        # Tính dung lượng notes
+        for root, dirs, files in os.walk(self.notes_dir):
+            for file in files:
+                filepath = os.path.join(root, file)
+                if os.path.exists(filepath):
+                    total_size += os.path.getsize(filepath)
+        
+        # Tính dung lượng docs
+        for root, dirs, files in os.walk(self.docs_dir):
+            for file in files:
+                filepath = os.path.join(root, file)
+                if os.path.exists(filepath):
+                    total_size += os.path.getsize(filepath)
+        
+        return total_size
+    
+    def check_storage_available(self, file_size, max_storage=2*1024*1024*1024):
+        """
+        Kiểm tra xem còn đủ dung lượng để upload file không
+        
+        Args:
+            file_size: Kích thước file muốn upload (bytes)
+            max_storage: Giới hạn tổng dung lượng (bytes), mặc định 2GB
+        
+        Returns:
+            (bool, str): (True/False, message)
+        """
+        current_size = self.get_total_storage_size()
+        
+        if current_size + file_size > max_storage:
+            used_mb = current_size / (1024 * 1024)
+            max_mb = max_storage / (1024 * 1024)
+            return False, f"Không đủ dung lượng! Đã dùng {used_mb:.1f}MB/{max_mb:.0f}MB"
+        
+        return True, "OK"
+    
     def add_note_attachment(self, note_id, uploaded_file):
         """Thêm file đính kèm vào note"""
         import uuid
         from werkzeug.utils import secure_filename
+        
+        # Kiểm tra dung lượng trước khi upload
+        uploaded_file.seek(0, 2)  # Seek to end
+        file_size = uploaded_file.tell()
+        uploaded_file.seek(0)  # Reset to beginning
+        
+        can_upload, message = self.check_storage_available(file_size)
+        if not can_upload:
+            return False, message
         
         metadata = self._load_metadata()
         for note_meta in metadata['notes']:
@@ -250,7 +306,7 @@ class FileStorage:
                 # Lấy phần mở rộng file
                 original_filename = secure_filename(uploaded_file.filename)
                 if not original_filename:
-                    return False
+                    return False, "Tên file không hợp lệ"
                     
                 file_ext = os.path.splitext(original_filename)[1]
                 
@@ -273,8 +329,8 @@ class FileStorage:
                 note_meta['updated_at'] = datetime.utcnow().isoformat()
                 
                 self._save_metadata(metadata)
-                return True
-        return False
+                return True, "Upload thành công"
+        return False, "Không tìm thấy ghi chú"
     
     def delete_note_attachment(self, note_id, attachment_filename):
         """Xóa file đính kèm từ note - Dù file vật lý còn hay không thì vẫn xóa attachment khỏi metadata"""
